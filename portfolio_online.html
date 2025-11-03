@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skiezz VFX - Portfolio</title>
+  <style>
+    body {margin:0;background:#0b0014;color:#fff;font-family:sans-serif;}
+    header {padding:20px;text-align:center;background:#1a0627;}
+    a{color:#c18cff}
+    .section{padding:40px;}
+    .project-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;}
+    .card{background:#1a0627;padding:20px;border-radius:12px;}
+    .admin-login,.admin-panel{max-width:500px;margin:40px auto;background:#1a0627;padding:20px;border-radius:12px;}
+    input,textarea{width:100%;padding:10px;margin:8px 0;background:#0b0014;color:#fff;border:1px solid #5a2585;border-radius:8px;}
+    button{padding:10px 15px;background:#5a2585;color:#fff;border:none;border-radius:8px;cursor:pointer;}
+    nav{text-align:center;margin-top:10px;}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Skiezz VFX</h1>
+    <p>Portfolio futuriste</p>
+    <nav>
+      <a href="#projects">Projets</a> |
+      <a href="#contact">Contact</a> |
+      <a href="/admin">Admin</a>
+    </nav>
+  </header>
+
+  <section class="section" id="projects">
+    <h2>Mes Projets</h2>
+    <div class="project-grid" id="projectList"></div>
+  </section>
+
+  <section class="section" id="contact">
+    <h2>Contact</h2>
+    <p>Discord: <strong>ton_discord</strong></p>
+    <p>YouTube: <strong>ton_youtube</strong></p>
+    <p>X: <strong>ton_x</strong></p>
+  </section>
+
+  <!-- Admin Login Page -->
+  <div class="admin-login" id="adminLogin" style="display:none;">
+    <h2>Connexion Admin</h2>
+    <input id="adminUser" placeholder="username" />
+    <input id="adminPass" placeholder="password" type="password" />
+    <button onclick="loginAdmin()">Login</button>
+  </div>
+
+  <!-- Admin Panel -->
+  <div class="admin-panel" id="adminPanel" style="display:none;">
+    <h2>Admin Panel</h2>
+    <button onclick="logoutAdmin()">Se déconnecter</button>
+
+    <h3>Ajouter Projet</h3>
+    <input id="pTitle" placeholder="Titre" />
+    <input id="pImg" placeholder="Image URL" />
+    <textarea id="pDesc" placeholder="Description"></textarea>
+    <button onclick="addProject()">Ajouter</button>
+
+    <h3>Projets</h3>
+    <div id="adminProjectList"></div>
+  </div>
+
+<script>
+// Admin creds
+const ADMIN_USER = "admin";
+const ADMIN_PASS = "skiezz123";
+
+// Routing simple
+if (window.location.pathname.endsWith("/admin")) {
+  document.getElementById("adminLogin").style.display = "block";
+}
+
+// Admin login
+function loginAdmin(){
+  let u = document.getElementById("adminUser").value;
+  let p = document.getElementById("adminPass").value;
+  if(u===ADMIN_USER && p===ADMIN_PASS){
+    localStorage.setItem("admin", "true");
+    location.reload();
+  } else alert("Informations incorrectes");
+}
+
+function logoutAdmin(){
+  localStorage.removeItem("admin");
+  location.href = "/";
+}
+
+// Show admin panel if logged
+if(localStorage.getItem("admin") === "true" && window.location.pathname.endsWith("/admin")){
+  document.getElementById("adminPanel").style.display = "block";
+  document.getElementById("adminLogin").style.display = "none";
+  loadAdminProjects();
+}
+
+// PROJECTS
+function loadProjects(){
+  let list = JSON.parse(localStorage.getItem("projects")||"[]");
+  let zone = document.getElementById("projectList");
+  zone.innerHTML = "";
+  list.forEach(pr=>{
+    zone.innerHTML += `<div class="card"><img src="${pr.img}" style="width:100%;border-radius:8px;"/><h3>${pr.title}</h3><p>${pr.desc}</p></div>`;
+  });
+}
+loadProjects();
+
+function addProject(){
+  let title = document.getElementById("pTitle").value;
+  let img = document.getElementById("pImg").value;
+  let desc = document.getElementById("pDesc").value;
+  let list = JSON.parse(localStorage.getItem("projects")||"[]");
+  list.push({title,img,desc});
+  localStorage.setItem("projects", JSON.stringify(list));
+  loadProjects(); loadAdminProjects();
+  alert("Projet ajouté !");
+}
+
+function loadAdminProjects(){
+  let list = JSON.parse(localStorage.getItem("projects")||"[]");
+  let zone = document.getElementById("adminProjectList");
+  zone.innerHTML="";
+  list.forEach((pr,i)=>{
+    zone.innerHTML += `<div class='card'><h4>${pr.title}</h4><button onclick='delProject(${i})'>Supprimer</button></div>`;
+  });
+}
+
+function delProject(i){
+  let list = JSON.parse(localStorage.getItem("projects")||"[]");
+  list.splice(i,1);
+  localStorage.setItem("projects",JSON.stringify(list));
+  loadProjects(); loadAdminProjects();
+}
+</script>
+</body>
+</html>
