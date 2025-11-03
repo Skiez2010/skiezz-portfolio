@@ -1,2 +1,374 @@
-username : admin
-password : skiezz123
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>skiezz Vfx — Portfolio</title>
+<meta name="description" content="Portfolio skiezz Vfx — Montages & VFX" />
+<style>
+  :root{--bg:#04020a;--panel:#0b0712;--muted:#9aa0b2;--neon:#8b5cf6;--accent:#7c3aed;}
+  *{box-sizing:border-box} body{margin:0;font-family:Inter, system-ui, -apple-system,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#02020a,#080418);color:#eaf0ff}
+  header{padding:22px;text-align:center;background:linear-gradient(180deg,rgba(12,4,20,0.8),transparent)}
+  .logo{font-weight:900;color:var(--neon);letter-spacing:1px;font-size:20px}
+  main{max-width:1100px;margin:18px auto;padding:12px}
+  .layout{display:grid;grid-template-columns:1fr 340px;gap:18px}
+  .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+  h1{margin:0 0 6px 0}
+  .lead{color:var(--muted)}
+  .controls{display:flex;gap:8px;margin-top:12px}
+  .btn{background:linear-gradient(90deg,var(--accent),#a78bfa);padding:10px 12px;border-radius:10px;color:#fff;border:none;cursor:pointer}
+  .gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px}
+  .project{border-radius:12px;overflow:hidden;position:relative;background:#0b0312;padding:8px}
+  .thumb{width:100%;height:140px;background:#12061a;background-size:cover;background-position:center;border-radius:8px}
+  .meta{padding:8px}
+  .meta h3{margin:0;font-size:16px}
+  .meta p{margin:6px 0 0 0;color:var(--muted);font-size:13px}
+  .socials{display:flex;gap:8px;flex-wrap:wrap}
+  .small{font-size:13px;color:var(--muted)}
+  .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,2,8,0.7);z-index:60}
+  .overlay.open{display:flex} .modal{width:920px;max-width:95%;background:#040314;padding:16px;border-radius:12px}
+  @media(max-width:980px){.layout{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">skiezz Vfx</div>
+    <div class="small">Montages • VFX • Events</div>
+  </header>
+
+  <main>
+    <div class="layout">
+      <section class="card">
+        <h1>Mes Projets</h1>
+        <p class="lead">Clique sur un projet pour ouvrir la vidéo (nouvel onglet) ou la regarder en pop-up.</p>
+        <div class="controls">
+          <button class="btn" id="open-admin">Admin</button>
+          <button class="btn" id="export-btn">Exporter JSON</button>
+          <button class="btn" id="import-btn">Importer JSON</button>
+          <div style="margin-left:auto" id="auth-status"></div>
+        </div>
+
+        <div id="gallery" class="gallery" aria-live="polite"></div>
+      </section>
+
+      <aside class="card">
+        <h3>Contact & Réseaux</h3>
+        <div style="margin-top:8px" id="socialsArea">
+          <div class="small">Discord: <span id="s-discord">-</span></div>
+          <div class="small">YouTube: <span id="s-yt">-</span></div>
+          <div class="small">X: <span id="s-x">-</span></div>
+        </div>
+        <hr style="opacity:0.06;margin:12px 0">
+        <div class="small">Comptes démo : admin@example.com / skiezz123 (après création dans Firebase)</div>
+      </aside>
+    </div>
+  </main>
+
+  <!-- Admin & Modals -->
+  <div class="overlay" id="overlay">
+    <div class="modal" id="modal">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 id="modal-title">Admin</h3>
+        <div style="display:flex;gap:8px">
+          <button class="btn" id="modal-save">Enregistrer</button>
+          <button class="btn" id="modal-close">Fermer</button>
+        </div>
+      </div>
+
+      <div id="modal-body" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- Firebase SDKs (compat - simple to use) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+  <script>
+  /******************************************************
+   * CONFIGURATION FIREBASE - REMPLACE ICI AVEC LA TIENNE
+   ******************************************************/
+  // Si tu veux démarrer sans Firebase, laisse firebaseConfig = null
+  const firebaseConfig = {
+    // EXEMPLE:
+    // apiKey: "AIza....",
+    // authDomain: "ton-projet.firebaseapp.com",
+    // projectId: "ton-projet",
+    // storageBucket: "ton-projet.appspot.com",
+    // messagingSenderId: "123456",
+    // appId: "1:123:web:abc"
+  };
+  /******************************************************/
+
+  // fallback: si config vide => localStorage mode
+  const useFirebase = firebaseConfig && Object.keys(firebaseConfig).length > 0;
+
+  // Local fallback functions
+  function getLocal(key, def){ try{ return JSON.parse(localStorage.getItem(key)||JSON.stringify(def)); }catch(e){ return def; } }
+  function setLocal(key, v){ localStorage.setItem(key, JSON.stringify(v)); }
+
+  // --- Firebase init ---
+  let db = null, auth = null;
+  if(useFirebase){
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.firestore();
+  }
+
+  // UI refs
+  const gallery = document.getElementById('gallery');
+  const overlay = document.getElementById('overlay');
+  const modal = document.getElementById('modal');
+  const modalBody = document.getElementById('modal-body');
+  const authStatus = document.getElementById('auth-status');
+
+  // helpers
+  function ytIdFromUrl(url){
+    if(!url) return null;
+    const m = url.match(/[?&]v=([\\w-]{11})/) || url.match(/youtu\\.be\\/([\\w-]{11})/);
+    return m?m[1]:null;
+  }
+  function ytThumbFromId(id){ return id?`https://img.youtube.com/vi/${id}/maxresdefault.jpg`:``; }
+
+  // Fetch & render projects (Firebase real-time or local)
+  let unsubscribe = null;
+  function startProjectsListener(){
+    if(useFirebase){
+      if(unsubscribe) unsubscribe();
+      unsubscribe = db.collection('projects').orderBy('createdAt','desc').onSnapshot(snap=>{
+        const arr = [];
+        snap.forEach(d=>arr.push({id:d.id, ...d.data()}));
+        renderProjects(arr);
+      });
+    } else {
+      const arr = getLocal('projects', []);
+      renderProjects(arr);
+    }
+  }
+
+  function renderProjects(arr){
+    gallery.innerHTML = '';
+    arr.forEach(p=>{
+      const el = document.createElement('div'); el.className='project';
+      const id = ytIdFromUrl(p.video||'') || '';
+      const thumb = p.thumb || (id? ytThumbFromId(id) : '');
+      el.innerHTML = `
+        <div class="thumb" style="background-image:url('${thumb}');"></div>
+        <div class="meta">
+          <h3>${escapeHtml(p.title||'Sans titre')}</h3>
+          <p class="small">${escapeHtml(p.desc||'')}</p>
+          <div style="margin-top:8px;display:flex;gap:8px">
+            <button class="btn btn-open" data-url="${escapeAttr(p.video||'')}" style="padding:8px 10px">Ouvrir (onglet)</button>
+            <button class="btn btn-popup" data-url="${escapeAttr(p.video||'')}" style="padding:8px 10px">Popup</button>
+          </div>
+        </div>`;
+      gallery.appendChild(el);
+    });
+
+    // attach btn events
+    document.querySelectorAll('.btn-open').forEach(b=>{
+      b.addEventListener('click', e=>{ const url=e.currentTarget.dataset.url; if(!url) return alert('Pas de vidéo'); window.open(url,'_blank'); });
+    });
+    document.querySelectorAll('.btn-popup').forEach(b=>{
+      b.addEventListener('click', e=>{ const url=e.currentTarget.dataset.url; openVideoPopup(url); });
+    });
+  }
+
+  function escapeHtml(s){ if(!s) return ''; return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function escapeAttr(s){ return (s||'').replace(/\"/g,'&quot;'); }
+
+  // video popup
+  function openVideoPopup(url){
+    if(!url) return alert('Pas de vidéo');
+    const id = ytIdFromUrl(url);
+    const src = id ? `https://www.youtube.com/embed/${id}?autoplay=1` : url;
+    const body = `<div style="width:100%;height:0;padding-bottom:56%;position:relative"><iframe src="${src}" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="autoplay;encrypted-media" allowfullscreen></iframe></div>`;
+    modalBody.innerHTML = body;
+    document.getElementById('modal-title').textContent = 'Lecture vidéo';
+    overlay.classList.add('open');
+    document.getElementById('modal-close').onclick = ()=>{ overlay.classList.remove('open'); modalBody.innerHTML=''; };
+    document.getElementById('modal-save').style.display='none';
+  }
+
+  // ADMIN UI
+  document.getElementById('open-admin').addEventListener('click', ()=>{ openAdmin(); });
+  document.getElementById('export-btn').addEventListener('click', ()=>{ exportJSON(); });
+  document.getElementById('import-btn').addEventListener('click', ()=>{ importJSON(); });
+
+  function openAdmin(){
+    // if using firebase: show auth first or panel if connected
+    if(useFirebase){
+      if(!auth.currentUser){
+        showLoginForm(true);
+        return;
+      } else {
+        showAdminPanel();
+      }
+    } else {
+      // local mode: simple password prompt
+      const pw = prompt('Mot de passe admin (local)'); if(pw !== 'skiezz123') return alert('Mauvais mot de passe'); showAdminPanel();
+    }
+  }
+
+  function showLoginForm(showOverlay){
+    modalBody.innerHTML = `
+      <label>Email</label><input id="login-email" placeholder="admin@example.com" />
+      <label>Mot de passe</label><input id="login-pass" type="password" />
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button id="btn-login" class="btn">Se connecter</button>
+        <button id="btn-register" class="btn">Créer admin</button>
+      </div>
+    `;
+    document.getElementById('modal-title').textContent = 'Connexion Admin';
+    overlay.classList.add('open');
+    document.getElementById('modal-save').style.display='none';
+    document.getElementById('modal-close').onclick = ()=>{ overlay.classList.remove('open'); };
+    document.getElementById('btn-login').onclick = async ()=>{
+      const e=document.getElementById('login-email').value.trim();
+      const p=document.getElementById('login-pass').value;
+      if(!e||!p) return alert('email + mdp');
+      if(useFirebase){
+        try{ await auth.signInWithEmailAndPassword(e,p); overlay.classList.remove('open'); showAdminPanel(); }catch(err){ alert('Erreur: '+err.message); }
+      } else {
+        alert('Mode local: utilise mot de passe skiezz123'); if(p==='skiezz123'){ overlay.classList.remove('open'); showAdminPanel(); }
+      }
+    };
+    document.getElementById('btn-register').onclick = async ()=>{
+      const e=document.getElementById('login-email').value.trim();
+      const p=document.getElementById('login-pass').value;
+      if(!e||!p) return alert('email + mdp');
+      if(useFirebase){
+        try{ await auth.createUserWithEmailAndPassword(e,p); alert('Compte créé.'); }catch(err){ alert('Erreur: '+err.message); }
+      } else {
+        alert('En local, pas d\'inscription automatique. Utilise: skiezz123'); 
+      }
+    };
+  }
+
+  function showAdminPanel(){
+    // build admin HTML: socials + add project + list projects
+    document.getElementById('modal-title').textContent = 'Admin Panel';
+    modalBody.innerHTML = `
+      <h4>Profil & Réseaux</h4>
+      <label>Discord</label><input id="a-discord" placeholder="https://discord.gg/..." />
+      <label>YouTube</label><input id="a-yt" placeholder="https://youtube.com/..." />
+      <label>X</label><input id="a-x" placeholder="https://x.com/..." />
+      <button id="save-socials" class="btn" style="margin-top:8px">Enregistrer réseaux</button>
+      <hr style="margin:12px 0">
+      <h4>Ajouter un projet</h4>
+      <label>Titre</label><input id="a-title" />
+      <label>Lien vidéo (YouTube)</label><input id="a-video" placeholder="https://www.youtube.com/watch?v=..." />
+      <label>Miniature (optionnel)</label><input id="a-thumb" placeholder="https://..." />
+      <label>Description</label><textarea id="a-desc"></textarea>
+      <div style="margin-top:8px;display:flex;gap:8px"><button id="add-proj" class="btn">Ajouter</button><button id="logout" class="btn">Se déconnecter</button></div>
+      <hr style="margin:12px 0">
+      <h4>Projets existants</h4>
+      <div id="admin-projects"></div>
+    `;
+    overlay.classList.add('open');
+    document.getElementById('modal-close').onclick = ()=>{ overlay.classList.remove('open'); };
+    document.getElementById('modal-save').style.display='none';
+
+    // load socials
+    if(useFirebase){
+      db.collection('meta').doc('socials').get().then(d=>{
+        const s = d.exists? d.data() : {};
+        document.getElementById('a-discord').value = s.discord || '';
+        document.getElementById('a-yt').value = s.yt || '';
+        document.getElementById('a-x').value = s.x || '';
+      });
+    } else {
+      const s = getLocal('socials',{}); document.getElementById('a-discord').value = s.discord||''; document.getElementById('a-yt').value = s.yt||''; document.getElementById('a-x').value = s.x||'';
+    }
+
+    document.getElementById('save-socials').onclick = ()=>{
+      const s = {discord:document.getElementById('a-discord').value.trim(), yt:document.getElementById('a-yt').value.trim(), x:document.getElementById('a-x').value.trim()};
+      if(useFirebase){
+        db.collection('meta').doc('socials').set(s).then(()=>{ alert('Mis à jour'); loadSocials(); });
+      } else { setLocal('socials', s); alert('Mis à jour'); loadSocials(); }
+    };
+
+    document.getElementById('add-proj').onclick = ()=>{
+      const t=document.getElementById('a-title').value.trim(); const v=document.getElementById('a-video').value.trim(); const thumb=document.getElementById('a-thumb').value.trim(); const desc=document.getElementById('a-desc').value.trim();
+      if(!t) return alert('Titre requis');
+      const doc = { title: t, video: v, thumb: thumb, desc: desc, createdAt: firebase.firestore ? firebase.firestore.FieldValue.serverTimestamp() : Date.now() };
+      if(useFirebase){
+        db.collection('projects').add(doc).then(()=>{ alert('Ajouté'); document.getElementById('a-title').value=''; document.getElementById('a-video').value=''; document.getElementById('a-thumb').value=''; document.getElementById('a-desc').value=''; });
+      } else {
+        const arr = getLocal('projects',[]); arr.unshift(doc); setLocal('projects', arr); renderProjects(arr); alert('Ajouté'); 
+      }
+    };
+
+    document.getElementById('logout').onclick = async ()=>{
+      if(useFirebase){ await auth.signOut(); overlay.classList.remove('open'); } else { overlay.classList.remove('open'); }
+    };
+
+    // populate admin projects
+    if(useFirebase){
+      db.collection('projects').orderBy('createdAt','desc').get().then(snap=>{
+        const zone = document.getElementById('admin-projects'); zone.innerHTML=''; snap.forEach(d=>{
+          const it = {id:d.id, ...d.data()};
+          const row = document.createElement('div'); row.style.marginBottom='10px'; row.innerHTML = `<div style="display:flex;gap:8px;align-items:center"><div style="flex:1"><strong>${escapeHtml(it.title)}</strong><div class="small">${escapeHtml(it.desc||'')}</div></div><div><button class="btn edit" data-id="${it.id}">Edit</button><button class="btn del" data-id="${it.id}">Suppr</button></div></div>`;
+          zone.appendChild(row);
+        });
+        zone.querySelectorAll('.del').forEach(b=>b.onclick = ()=>{ if(confirm('Supprimer?')) db.collection('projects').doc(b.dataset.id).delete().then(()=>{ alert('Supprimé'); }); });
+        zone.querySelectorAll('.edit').forEach(b=>b.onclick = async ()=>{
+          const id=b.dataset.id; const d = await db.collection('projects').doc(id).get(); const it = d.data();
+          document.getElementById('a-title').value = it.title||''; document.getElementById('a-video').value = it.video||''; document.getElementById('a-thumb').value = it.thumb||''; document.getElementById('a-desc').value = it.desc||'';
+          // when save, update existing instead of new
+          document.getElementById('add-proj').textContent = 'Mettre à jour'; document.getElementById('add-proj').onclick = ()=>{
+            db.collection('projects').doc(id).update({ title:document.getElementById('a-title').value.trim(), video:document.getElementById('a-video').value.trim(), thumb:document.getElementById('a-thumb').value.trim(), desc:document.getElementById('a-desc').value.trim() }).then(()=>{ alert('Mis à jour'); document.getElementById('add-proj').textContent='Ajouter'; showAdminPanel(); });
+          };
+        });
+      });
+    } else {
+      // local list
+      const arr = getLocal('projects', []);
+      const zone = document.getElementById('admin-projects'); zone.innerHTML=''; arr.forEach((it, i)=>{
+        const row = document.createElement('div'); row.style.marginBottom='10px'; row.innerHTML = `<div style="display:flex;gap:8px;align-items:center"><div style="flex:1"><strong>${escapeHtml(it.title)}</strong><div class="small">${escapeHtml(it.desc||'')}</div></div><div><button class="btn edit" data-i="${i}">Edit</button><button class="btn del" data-i="${i}">Suppr</button></div></div>`;
+        zone.appendChild(row);
+      });
+      zone.querySelectorAll('.del').forEach(b=>b.onclick = ()=>{ if(confirm('Supprimer?')){ const i=Number(b.dataset.i); arr.splice(i,1); setLocal('projects',arr); loadProjects(); showAdminPanel(); } });
+      zone.querySelectorAll('.edit').forEach(b=>b.onclick = ()=>{ const i=Number(b.dataset.i); const it = arr[i]; document.getElementById('a-title').value=it.title; document.getElementById('a-video').value=it.video; document.getElementById('a-thumb').value=it.thumb; document.getElementById('a-desc').value=it.desc; document.getElementById('add-proj').textContent='Mettre à jour'; document.getElementById('add-proj').onclick = ()=>{ arr[i] = { title:document.getElementById('a-title').value.trim(), video:document.getElementById('a-video').value.trim(), thumb:document.getElementById('a-thumb').value.trim(), desc:document.getElementById('a-desc').value.trim() }; setLocal('projects',arr); loadProjects(); showAdminPanel(); }; });
+    }
+  }
+
+  // socials load
+  function loadSocials(){
+    if(useFirebase){
+      db.collection('meta').doc('socials').get().then(d=>{ const s = d.exists? d.data() : {}; document.getElementById('s-discord').textContent = s.discord||'-'; document.getElementById('s-yt').textContent = s.yt||'-'; document.getElementById('s-x').textContent = s.x||'-'; });
+    } else {
+      const s = getLocal('socials',{}); document.getElementById('s-discord').textContent = s.discord||'-'; document.getElementById('s-yt').textContent = s.yt||'-'; document.getElementById('s-x').textContent = s.x||'-';
+    }
+  }
+
+  // export/import
+  function exportJSON(){
+    if(useFirebase){
+      db.collection('projects').get().then(snap=>{ const arr=[]; snap.forEach(d=>arr.push({id:d.id, ...d.data()})); const blob = new Blob([JSON.stringify(arr,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='projects.json'; a.click(); URL.revokeObjectURL(url); });
+    } else {
+      const arr = getLocal('projects',[]); const blob = new Blob([JSON.stringify(arr,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='projects.json'; a.click(); URL.revokeObjectURL(url);
+    }
+  }
+  function importJSON(){
+    const raw = prompt('Colle le JSON des projets (array)'); if(!raw) return; try{ const parsed = JSON.parse(raw); if(!Array.isArray(parsed)) throw 0; if(useFirebase){ parsed.forEach(it=>{ const copy = { title:it.title||'', video:it.video||'', thumb:it.thumb||'', desc:it.desc||'', createdAt: firebase.firestore.FieldValue.serverTimestamp() }; db.collection('projects').add(copy); }); alert('Import lancé'); } else { setLocal('projects', parsed); loadProjects(); alert('Import OK'); } }catch(e){ alert('JSON invalide'); }
+  }
+
+  // initial load
+  startProjectsListener();
+  loadSocials();
+
+  // auth state listener (firebase)
+  if(useFirebase){
+    auth.onAuthStateChanged(u=>{
+      if(u) authStatus.innerHTML = `<span style="color:var(--neon)">Connecté: ${escapeHtml(u.email)}</span>`; else authStatus.innerHTML = `<span class="small">Non connecté</span>`;
+    });
+  } else {
+    authStatus.innerHTML = `<span class="small">Local mode</span>`;
+  }
+
+  // small helper: if firebaseConfig empty => warn dev
+  if(!useFirebase) console.warn('Firebase config vide — mode local activé. Les changements restent sur cet appareil.');
+  </script>
+</body>
+</html>
